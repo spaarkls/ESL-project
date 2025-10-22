@@ -1,0 +1,7 @@
+.vscode
+
+_build
+
+*.o
+
+*.aut
