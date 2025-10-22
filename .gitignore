@@ -4,4 +4,4 @@ _build
 
 *.o
 
-*.aut
+*.out
