@@ -20,7 +20,7 @@ int main(void) {
     shared_state_t led_state = {{6,5,9,8}, SHORT_DELAY_MS};
 
     while (true) {
-        for (int led = 0; led < LEDS_NUMBER; led++) {
+        for (short led = 0; led < LEDS_NUMBER; led++) {
             led_blink_n_times(led, &led_state);
             nrf_delay_ms(LONG_DELAY_MS);
         }
