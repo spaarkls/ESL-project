@@ -24,46 +24,54 @@ typedef enum {
     STATE_COLOR_SELECT_HUE,
     STATE_COLOR_SELECT_SATURATION, 
     STATE_COLOR_SELECT_BRIGHTNESS,
-    
     STATE_COLOR_MAX,
 } STATE_COLOR;
+
+
+struct app_color {
+    struct HSV hsv;
+    struct RGB rgb;
+    STATE_COLOR current_state;
+    uint16_t state_value;
+    bool fade_up_yellow;
+    bool fade_up_other;
+};
 
 APP_TIMER_DEF(timer_double_click);
 APP_TIMER_DEF(timer_debouncing);
 APP_TIMER_DEF(timer_update_color);
 
-static volatile STATE_COLOR current_color_state = STATE_COLOR_NONE;
-static struct HSV hsv = HSV_DEFAULT_CONFIG;
-static struct RGB rgb = RGB_DEFAULT_CONFIG;
+static struct app_color *g_app = NULL;
 
 static nrfx_pwm_t pwm0 = NRFX_PWM_INSTANCE(0);
 static nrf_pwm_values_individual_t pwm_vals;
 static nrf_pwm_sequence_t pwm_seq;
 
-static uint16_t value = 0;
-static uint16_t value_hue = HSV_DEFAULT_HUE;
-static uint16_t value_satur = HSV_DEFAULT_SATURATION;
-static uint16_t value_bright = HSV_DEFAULT_BRIGHTNESS;
 
 static volatile bool button_block = false;
 static volatile bool button_first_click = false;
 static volatile bool button_is_pressed = false;
-static bool fade_up_yellow = true;
-static bool fade_up_other = true;
 
-static void init_gpiote(void);
-static void init_timers(void);
-static void init_pwm(void);
+static void init_app(struct app_color *app);
+
+static void init_gpiote(void *ctx);
+static void init_timers(void *ctx);
+static void init_pwm(void *ctx);
+
 static void handler_button_pressed(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
 static void handler_debouncing_timer(void *ctx);
 static void handler_double_click_timer(void *ctx);
-static void process_led_1(void);
+static void process_led_1(void *ctx);
 
 
 int main(void) {
-    init_timers();
-    init_gpiote();
-    init_pwm();
+    struct app_color app;
+    init_app(&app);
+    g_app = &app;
+
+    init_timers(&app);
+    init_gpiote(&app);
+    init_pwm(&app);
 
     while (true) {
         __WFE();
@@ -85,9 +93,9 @@ static void handler_double_click_timer(void *ctx) {
 
 
 static void handler_update_color_timer(void *ctx) {
-    (void)ctx;
-
-    process_led_1();
+    VALID_PTR(ctx);
+    struct app_color *app = ctx;
+    process_led_1(app);
 
     if (button_is_pressed) {
         if (nrf_gpio_pin_read(BUTTON) != 0) {
@@ -99,55 +107,56 @@ static void handler_update_color_timer(void *ctx) {
         return;
     }
 
-    if (current_color_state == STATE_COLOR_NONE) {
+    if (app->current_state == STATE_COLOR_NONE) {
         return;
     }
 
-    switch (current_color_state) {
+    switch (app->current_state) {
         case STATE_COLOR_SELECT_HUE:
-            if (fade_up_other) {
-                value_hue += STEP_CHANGE_HUE;
-                if (value_hue >= MAX_VALUE_HUE) {
-                    value_hue = MAX_VALUE_HUE;
-                    fade_up_other = false;
+            if (app->fade_up_other) {
+                app->hsv.hue += STEP_CHANGE_HUE;
+                if (app->hsv.hue >= MAX_VALUE_HUE) {
+                    app->hsv.hue = MAX_VALUE_HUE;
+                    app->fade_up_other = false;
                 }
+
             } else {
-                value_hue -= STEP_CHANGE_HUE;
-                if (value_hue < STEP_CHANGE_HUE) {
-                    value_hue = 0;
-                    fade_up_other = true;
+                app->hsv.hue -= STEP_CHANGE_HUE;
+                if (app->hsv.hue < STEP_CHANGE_HUE) {
+                    app->hsv.hue = 0;
+                    app->fade_up_other = true;
                 }
             }
             break;
 
         case STATE_COLOR_SELECT_SATURATION:
-            if (fade_up_other) {
-                value_satur += STEP_CHANGE_SATURATION;
-                if (value_satur >= MAX_VALUE_SATURATION) {
-                    value_satur = MAX_VALUE_SATURATION;
-                    fade_up_other = false;
+            if (app->fade_up_other) {
+                app->hsv.saturation += STEP_CHANGE_SATURATION;
+                if (app->hsv.saturation >= MAX_VALUE_SATURATION) {
+                    app->hsv.saturation = MAX_VALUE_SATURATION;
+                    app->fade_up_other = false;
                 }
             } else {
-                value_satur -= STEP_CHANGE_SATURATION;
-                if (value_satur < STEP_CHANGE_SATURATION) {
-                    value_satur = 0;
-                    fade_up_other = true;
+                app->hsv.saturation -= STEP_CHANGE_SATURATION;
+                if (app->hsv.saturation < STEP_CHANGE_SATURATION) {
+                    app->hsv.saturation = 0;
+                    app->fade_up_other = true;
                 }
             }
             break;
 
         case STATE_COLOR_SELECT_BRIGHTNESS:
-            if (fade_up_other) {
-                value_bright += STEP_CHANGE_BRIGHT;
-                if (value_bright >= MAX_VALUE_BRIGHTNESS) {
-                    value_bright = MAX_VALUE_BRIGHTNESS;
-                    fade_up_other = false;
+            if (app->fade_up_other) {
+                app->hsv.brightness += STEP_CHANGE_BRIGHT;
+                if (app->hsv.brightness >= MAX_VALUE_BRIGHTNESS) {
+                    app->hsv.brightness = MAX_VALUE_BRIGHTNESS;
+                    app->fade_up_other = false;
                 }
             } else {
-                value_bright -= STEP_CHANGE_BRIGHT;
-                if (value_bright < STEP_CHANGE_BRIGHT) {
-                    value_bright = 0;
-                    fade_up_other = true;
+                app->hsv.brightness -= STEP_CHANGE_BRIGHT;
+                if (app->hsv.brightness < STEP_CHANGE_BRIGHT) {
+                    app->hsv.brightness = 0;
+                    app->fade_up_other = true;
                 }
             }
             break;
@@ -156,14 +165,10 @@ static void handler_update_color_timer(void *ctx) {
             break;
     }
 
-    hsv.hue = value_hue;
-    hsv.saturation = value_satur;
-    hsv.brightness = value_bright;
-
-    hsv_to_rgb(&hsv, &rgb);
-    pwm_vals.channel_1 = rgb.r;
-    pwm_vals.channel_2 = rgb.g;
-    pwm_vals.channel_3 = rgb.b;
+    color_hsv_to_rgb(&app->hsv, &app->rgb);
+    pwm_vals.channel_1 = app->rgb.red;
+    pwm_vals.channel_2 = app->rgb.green;
+    pwm_vals.channel_3 = app->rgb.blue;
 
     nrf_pwm_sequence_t seq = {
         .values.p_individual = &pwm_vals,
@@ -175,55 +180,59 @@ static void handler_update_color_timer(void *ctx) {
 }
 
 
-static void process_led_1(void) {
-    switch (current_color_state) {
+static void process_led_1(void *ctx) {
+    VALID_PTR(ctx);
+    struct app_color *app = ctx;
+    
+    switch (app->current_state) {
         case STATE_COLOR_NONE:
-            pwm_vals.channel_0 = 0;
+            app->state_value = 0;
             break;
 
         case STATE_COLOR_SELECT_HUE:
-            if (fade_up_yellow) {
-                value += STEP_CHANGE_YELLOW_COLOR_SLOW;
-                if (value >= PWM_TOP_VALUE) {
-                    value = PWM_TOP_VALUE;
-                    fade_up_yellow = false;
+            if (app->fade_up_yellow) {
+                app->state_value += STEP_CHANGE_YELLOW_COLOR_SLOW;
+                if (app->state_value >= PWM_TOP_VALUE) {
+                    app->state_value = PWM_TOP_VALUE;
+                    app->fade_up_yellow = false;
                 }
 
             } else {
-                value -= STEP_CHANGE_YELLOW_COLOR_SLOW;
-                if (value < STEP_CHANGE_YELLOW_COLOR_SLOW) {
-                    value = 0;
-                    fade_up_yellow = true;
+                app->state_value -= STEP_CHANGE_YELLOW_COLOR_SLOW;
+                if (app->state_value < STEP_CHANGE_YELLOW_COLOR_SLOW) {
+                    app->state_value = 0;
+                    app->fade_up_yellow = true;
                 }
             }
-            pwm_vals.channel_0 = value;
             break;
 
         case STATE_COLOR_SELECT_SATURATION:
-            if (fade_up_yellow) {
-                value += STEP_CHANGE_YELLOW_COLOR_FAST;
-                if (value >= PWM_TOP_VALUE) {
-                    value = PWM_TOP_VALUE;
-                    fade_up_yellow = false;
+            if (app->fade_up_yellow) {
+                app->state_value += STEP_CHANGE_YELLOW_COLOR_FAST;
+                if (app->state_value >= PWM_TOP_VALUE) {
+                    app->state_value = PWM_TOP_VALUE;
+                    app->fade_up_yellow = false;
                 }
 
             } else {
-                value -= STEP_CHANGE_YELLOW_COLOR_FAST;
-                if (value < STEP_CHANGE_YELLOW_COLOR_FAST) {
-                    value = 0;
-                    fade_up_yellow = true;
+                app->state_value -= STEP_CHANGE_YELLOW_COLOR_FAST;
+                if (app->state_value < STEP_CHANGE_YELLOW_COLOR_FAST) {
+                    app->state_value = 0;
+                    app->fade_up_yellow = true;
                 }
             }
-            pwm_vals.channel_0 = value;
             break;
 
         case STATE_COLOR_SELECT_BRIGHTNESS:
-            pwm_vals.channel_0 = PWM_TOP_VALUE;
+            app->state_value = PWM_TOP_VALUE;
+            break;
 
         default:
             break;
     }
     
+    pwm_vals.channel_0 = app->state_value;
+
     nrf_pwm_sequence_t seq = {
         .values.p_individual = &pwm_vals,
         .length = 4,
@@ -234,18 +243,37 @@ static void process_led_1(void) {
 }
 
 
-static void init_timers(void) {
+static void init_app(struct app_color *app) {
+    VALID_PTR(app);
+
+    color_init_hsv(&app->hsv);
+    color_init_rgb(&app->rgb);
+
+    app->current_state = STATE_COLOR_NONE;
+    app->fade_up_other = true;
+    app->fade_up_yellow = true;
+    app->state_value = 0;
+}
+
+
+static void init_timers(void *ctx) {
+    VALID_PTR(ctx);
+    struct app_color *app = ctx;
+
     nrfx_clock_init(NULL);
     nrfx_clock_lfclk_start();
     app_timer_init();
     app_timer_create(&timer_debouncing, APP_TIMER_MODE_SINGLE_SHOT, handler_debouncing_timer);
     app_timer_create(&timer_double_click, APP_TIMER_MODE_SINGLE_SHOT, handler_double_click_timer);
     app_timer_create(&timer_update_color, APP_TIMER_MODE_REPEATED, handler_update_color_timer);
-    app_timer_start(timer_update_color, APP_TIMER_TICKS(DELAY_INTERVAL_FADE_MS), NULL);
+    app_timer_start(timer_update_color, APP_TIMER_TICKS(DELAY_INTERVAL_FADE_MS), app);
 }
 
 
-static void init_pwm(void) {
+static void init_pwm(void *ctx) {
+    VALID_PTR(ctx);
+    struct app_color *app = ctx;
+
     nrfx_pwm_config_t config_pwm = {
         .output_pins = {
             LED_Y,
@@ -262,12 +290,13 @@ static void init_pwm(void) {
     
     nrfx_pwm_init(&pwm0, &config_pwm, NULL);
     
-    hsv_to_rgb(&hsv, &rgb);
+    color_hsv_to_rgb(&app->hsv, &app->rgb);
 
     pwm_vals.channel_0 = 0;
-    pwm_vals.channel_1 = rgb.r;
-    pwm_vals.channel_2 = rgb.g;
-    pwm_vals.channel_3 = rgb.b;
+
+    pwm_vals.channel_1 = app->rgb.red;
+    pwm_vals.channel_2 = app->rgb.green;
+    pwm_vals.channel_3 = app->rgb.blue;
 }
 
 
@@ -286,11 +315,13 @@ static void handler_button_pressed(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t 
             app_timer_start(timer_double_click, APP_TIMER_TICKS(DELAY_DOUBLE_CLICK_MS), NULL);
         
         } else {
-            current_color_state = (current_color_state + 1) % STATE_COLOR_MAX;
+            g_app->current_state = (g_app->current_state + 1) % STATE_COLOR_MAX;
             button_first_click = false;
-            fade_up_yellow = true;
-            fade_up_other = true;
-            value = 0;
+
+            g_app->state_value = 0;
+            g_app->fade_up_other = true;
+            g_app->fade_up_yellow = true;
+
             app_timer_stop(timer_double_click);
         }
     }   
@@ -298,13 +329,13 @@ static void handler_button_pressed(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t 
 }
 
 
-static void init_gpiote(void) {
+static void init_gpiote(void *ctx) {
+    (void)ctx;
+
     if (!nrfx_gpiote_is_init()) {
         nrfx_gpiote_init();
     }
 
-    // nrfx_gpiote_in_config_t config_in = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
-    // nrfx_gpiote_in_config_t config_in = NRFX_GPIOTE_CONFIG_IN_SENSE_TOGGLE(true);
     nrfx_gpiote_in_config_t config_in = NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
     config_in.pull = NRF_GPIO_PIN_PULLUP;
     nrfx_gpiote_in_init(BUTTON, &config_in, handler_button_pressed);

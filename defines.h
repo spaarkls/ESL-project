@@ -1,6 +1,8 @@
 #ifndef DEFINES_H__
 #define DEFINES_H__
 
+#include <stddef.h>
+
 #define PWM_TOP_VALUE 1000
 
 #define MAX_VALUE_HUE 360
@@ -15,15 +17,10 @@
 #define STEP_CHANGE_HUE 2
 #define STEP_CHANGE_SATURATION 1
 #define STEP_CHANGE_BRIGHT 1
-#define COUNT_LEDS 4
 
-// NEW DEFENITIONS:
 #define STEP_CHANGE_YELLOW_COLOR_FAST 50
 #define STEP_CHANGE_YELLOW_COLOR_SLOW 25
-#define STEP_CHANGE_RED_COLOR 25
-#define STEP_CHANGE_GREEN_COLOR 25
-#define STEP_CHANGE_BLUE_COLOR 25 
-// ================
 
+#define VALID_PTR(x) if ( ( x ) == NULL ) for (;;)
 
 #endif // DEFINES_H__

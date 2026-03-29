@@ -1,16 +1,33 @@
 #include "color.h"
 
 #include <math.h>
+
 #include "defines.h"
 
 
-void hsv_to_rgb(const struct HSV *hsv, struct RGB *rgb) {
+void color_init_hsv(struct HSV *hsv) {
+    VALID_PTR(hsv);
+
+    hsv->hue = HSV_DEFAULT_HUE;
+    hsv->saturation = HSV_DEFAULT_SATURATION;
+    hsv->brightness = HSV_DEFAULT_BRIGHTNESS;
+}
+
+void color_init_rgb(struct RGB *rgb) {
+    VALID_PTR(rgb);
+
+    rgb->red = RGB_DEFAULT_RED;
+    rgb->green = RGB_DEFAULT_GREEN;
+    rgb->blue = RGB_DEFAULT_BLUE;
+}
+
+
+void color_hsv_to_rgb(const struct HSV *hsv, struct RGB *rgb) {
     float h = hsv->hue;
     float s = hsv->saturation / 100.0f;
     float v = hsv->brightness / 100.0f;
 
     float c = v * s;
-    // float x = c * (1 - fabs(((int)h / 60) % 2 - 1));
     float x = c * (1 - fabs(fmod(h / 60.0f, 2) - 1));
     float m = v - c;
 
@@ -35,7 +52,7 @@ void hsv_to_rgb(const struct HSV *hsv, struct RGB *rgb) {
 
     }
 
-    rgb->r = (uint16_t)((r1 + m) * PWM_TOP_VALUE);
-    rgb->g = (uint16_t)((g1 + m) * PWM_TOP_VALUE);
-    rgb->b = (uint16_t)((b1 + m) * PWM_TOP_VALUE);
+    rgb->red = (uint16_t)((r1 + m) * PWM_TOP_VALUE);
+    rgb->green = (uint16_t)((g1 + m) * PWM_TOP_VALUE);
+    rgb->blue = (uint16_t)((b1 + m) * PWM_TOP_VALUE);
 }

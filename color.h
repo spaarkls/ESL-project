@@ -4,9 +4,14 @@
 #include <stdint.h>
 
 
-#define HSV_DEFAULT_HUE 353
-#define HSV_DEFAULT_SATURATION 100
-#define HSV_DEFAULT_BRIGHTNESS 100
+#define HSV_DEFAULT_HUE         ( 353 )
+#define HSV_DEFAULT_SATURATION  ( 100 )
+#define HSV_DEFAULT_BRIGHTNESS  ( 100 )
+
+#define RGB_DEFAULT_RED     ( 100 )
+#define RGB_DEFAULT_GREEN   ( 100 )
+#define RGB_DEFAULT_BLUE    ( 100 )
+
 
 #define HSV_DEFAULT_CONFIG { \
     .hue = HSV_DEFAULT_HUE, \
@@ -15,9 +20,9 @@
 }
 
 #define RGB_DEFAULT_CONFIG { \
-    .r = 100, \
-    .g = 100, \
-    .b = 100, \
+    .red = RGB_DEFAULT_RED, \
+    .green = RGB_DEFAULT_GREEN, \
+    .blue = RGB_DEFAULT_BLUE, \
 }
 
 struct HSV {
@@ -27,12 +32,16 @@ struct HSV {
 };
 
 struct RGB {
-    uint16_t r;
-    uint16_t g;
-    uint16_t b;
+    uint16_t red;
+    uint16_t green;
+    uint16_t blue;
 };
 
-void hsv_to_rgb(const struct HSV *hsv, struct RGB *rgb);
+void color_hsv_to_rgb(const struct HSV *hsv, struct RGB *rgb);
+
+void color_init_hsv(struct HSV *hsv);
+
+void color_init_rgb(struct RGB *rgb);
 
 
 #endif // COLOR_H__
