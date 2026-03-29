@@ -3,10 +3,15 @@
 
 #include <stdint.h>
 
+
+#define HSV_DEFAULT_HUE 353
+#define HSV_DEFAULT_SATURATION 100
+#define HSV_DEFAULT_BRIGHTNESS 100
+
 #define HSV_DEFAULT_CONFIG { \
-    .hue = 353, \
-    .saturation = 100, \
-    .brightness = 100, \
+    .hue = HSV_DEFAULT_HUE, \
+    .saturation = HSV_DEFAULT_SATURATION, \
+    .brightness = HSV_DEFAULT_BRIGHTNESS, \
 }
 
 #define RGB_DEFAULT_CONFIG { \

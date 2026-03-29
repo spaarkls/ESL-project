@@ -10,7 +10,8 @@ void hsv_to_rgb(const struct HSV *hsv, struct RGB *rgb) {
     float v = hsv->brightness / 100.0f;
 
     float c = v * s;
-    float x = c * (1 - fabs(((int)h / 60) % 2 - 1));
+    // float x = c * (1 - fabs(((int)h / 60) % 2 - 1));
+    float x = c * (1 - fabs(fmod(h / 60.0f, 2) - 1));
     float m = v - c;
 
     float r1, g1, b1;
