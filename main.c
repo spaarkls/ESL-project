@@ -9,6 +9,7 @@
 
 #include "color.h"
 #include "defines.h"
+#include "flash.h"
 
 
 #define BUTTON NRF_GPIO_PIN_MAP(1, 6)
@@ -35,6 +36,7 @@ struct app_color {
     uint16_t state_value;
     bool fade_up_yellow;
     bool fade_up_other;
+    bool need_write;
 };
 
 APP_TIMER_DEF(timer_double_click);
@@ -71,6 +73,9 @@ int main(void) {
 
     init_timers(&app);
     init_gpiote(&app);
+    // Read Data from FLASH
+    flash_read(FLASH_ADDRESS, &app.hsv, sizeof(struct HSV));
+    
     init_pwm(&app);
 
     while (true) {
@@ -186,6 +191,10 @@ static void process_led_1(void *ctx) {
     
     switch (app->current_state) {
         case STATE_COLOR_NONE:
+            if (app->need_write) {
+                app->need_write = false;
+                flash_write(FLASH_ADDRESS, &app->hsv, sizeof(struct HSV));
+            }
             app->state_value = 0;
             break;
 
@@ -224,6 +233,7 @@ static void process_led_1(void *ctx) {
             break;
 
         case STATE_COLOR_SELECT_BRIGHTNESS:
+            app->need_write = true;
             app->state_value = PWM_TOP_VALUE;
             break;
 
@@ -253,6 +263,7 @@ static void init_app(struct app_color *app) {
     app->fade_up_other = true;
     app->fade_up_yellow = true;
     app->state_value = 0;
+    app->need_write = false;
 }
 
 
