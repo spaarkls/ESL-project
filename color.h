@@ -26,9 +26,9 @@
 }
 
 struct HSV {
-    int16_t hue;
-    int16_t saturation;
-    int16_t brightness;
+    uint16_t hue;
+    uint16_t saturation;
+    uint16_t brightness;
 };
 
 struct RGB {

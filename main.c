@@ -64,7 +64,9 @@ static void handler_button_pressed(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t 
 static void handler_debouncing_timer(void *ctx);
 static void handler_double_click_timer(void *ctx);
 static void process_led_1(void *ctx);
-
+static void process_rgb(void *ctx);
+static void update_value_with_limits(uint16_t *value, uint16_t step, uint16_t max_value, bool *fade_up);
+static void update_pwm_channels(uint16_t value_ch0, uint16_t value_ch1, uint16_t value_ch2, uint16_t value_ch3);
 
 int main(void) {
     struct app_color app;
@@ -73,7 +75,6 @@ int main(void) {
 
     init_timers(&app);
     init_gpiote(&app);
-    // Read Data from FLASH
     flash_read(FLASH_ADDRESS, &app.hsv, sizeof(struct HSV));
     
     init_pwm(&app);
@@ -86,13 +87,13 @@ int main(void) {
 }
 
 static void handler_debouncing_timer(void *ctx) {
-    (void)ctx;
+    UNUSED(ctx);
     button_block = false;
 }
 
 
 static void handler_double_click_timer(void *ctx) {
-    (void)ctx;
+    UNUSED(ctx);
     button_first_click = false;
 }
 
@@ -108,80 +109,12 @@ static void handler_update_color_timer(void *ctx) {
         }
     }
 
-    if (!button_is_pressed) {
-        return;
+    if (button_is_pressed && app->current_state != STATE_COLOR_NONE) {
+        process_rgb(app);
     }
 
-    if (app->current_state == STATE_COLOR_NONE) {
-        return;
-    }
-
-    switch (app->current_state) {
-        case STATE_COLOR_SELECT_HUE:
-            if (app->fade_up_other) {
-                app->hsv.hue += STEP_CHANGE_HUE;
-                if (app->hsv.hue >= MAX_VALUE_HUE) {
-                    app->hsv.hue = MAX_VALUE_HUE;
-                    app->fade_up_other = false;
-                }
-
-            } else {
-                app->hsv.hue -= STEP_CHANGE_HUE;
-                if (app->hsv.hue < STEP_CHANGE_HUE) {
-                    app->hsv.hue = 0;
-                    app->fade_up_other = true;
-                }
-            }
-            break;
-
-        case STATE_COLOR_SELECT_SATURATION:
-            if (app->fade_up_other) {
-                app->hsv.saturation += STEP_CHANGE_SATURATION;
-                if (app->hsv.saturation >= MAX_VALUE_SATURATION) {
-                    app->hsv.saturation = MAX_VALUE_SATURATION;
-                    app->fade_up_other = false;
-                }
-            } else {
-                app->hsv.saturation -= STEP_CHANGE_SATURATION;
-                if (app->hsv.saturation < STEP_CHANGE_SATURATION) {
-                    app->hsv.saturation = 0;
-                    app->fade_up_other = true;
-                }
-            }
-            break;
-
-        case STATE_COLOR_SELECT_BRIGHTNESS:
-            if (app->fade_up_other) {
-                app->hsv.brightness += STEP_CHANGE_BRIGHT;
-                if (app->hsv.brightness >= MAX_VALUE_BRIGHTNESS) {
-                    app->hsv.brightness = MAX_VALUE_BRIGHTNESS;
-                    app->fade_up_other = false;
-                }
-            } else {
-                app->hsv.brightness -= STEP_CHANGE_BRIGHT;
-                if (app->hsv.brightness < STEP_CHANGE_BRIGHT) {
-                    app->hsv.brightness = 0;
-                    app->fade_up_other = true;
-                }
-            }
-            break;
-
-        default:
-            break;
-    }
-
-    color_hsv_to_rgb(&app->hsv, &app->rgb);
-    pwm_vals.channel_1 = app->rgb.red;
-    pwm_vals.channel_2 = app->rgb.green;
-    pwm_vals.channel_3 = app->rgb.blue;
-
-    nrf_pwm_sequence_t seq = {
-        .values.p_individual = &pwm_vals,
-        .length = 4,
-        .repeats = 0,
-        .end_delay = 0
-    };
-    nrfx_pwm_simple_playback(&pwm0, &seq, 1, 0);
+    update_pwm_channels(app->state_value, app->rgb.red, app->rgb.green, app->rgb.blue);
+    nrfx_pwm_simple_playback(&pwm0, &pwm_seq, 1, 0);
 }
 
 
@@ -199,37 +132,11 @@ static void process_led_1(void *ctx) {
             break;
 
         case STATE_COLOR_SELECT_HUE:
-            if (app->fade_up_yellow) {
-                app->state_value += STEP_CHANGE_YELLOW_COLOR_SLOW;
-                if (app->state_value >= PWM_TOP_VALUE) {
-                    app->state_value = PWM_TOP_VALUE;
-                    app->fade_up_yellow = false;
-                }
-
-            } else {
-                app->state_value -= STEP_CHANGE_YELLOW_COLOR_SLOW;
-                if (app->state_value < STEP_CHANGE_YELLOW_COLOR_SLOW) {
-                    app->state_value = 0;
-                    app->fade_up_yellow = true;
-                }
-            }
+            update_value_with_limits(&app->state_value, STEP_CHANGE_YELLOW_COLOR_SLOW, PWM_TOP_VALUE, &app->fade_up_yellow);
             break;
 
         case STATE_COLOR_SELECT_SATURATION:
-            if (app->fade_up_yellow) {
-                app->state_value += STEP_CHANGE_YELLOW_COLOR_FAST;
-                if (app->state_value >= PWM_TOP_VALUE) {
-                    app->state_value = PWM_TOP_VALUE;
-                    app->fade_up_yellow = false;
-                }
-
-            } else {
-                app->state_value -= STEP_CHANGE_YELLOW_COLOR_FAST;
-                if (app->state_value < STEP_CHANGE_YELLOW_COLOR_FAST) {
-                    app->state_value = 0;
-                    app->fade_up_yellow = true;
-                }
-            }
+            update_value_with_limits(&app->state_value, STEP_CHANGE_YELLOW_COLOR_FAST, PWM_TOP_VALUE, &app->fade_up_yellow);
             break;
 
         case STATE_COLOR_SELECT_BRIGHTNESS:
@@ -240,17 +147,58 @@ static void process_led_1(void *ctx) {
         default:
             break;
     }
-    
-    pwm_vals.channel_0 = app->state_value;
-
-    nrf_pwm_sequence_t seq = {
-        .values.p_individual = &pwm_vals,
-        .length = 4,
-        .repeats = 0,
-        .end_delay = 0
-    };
-    nrfx_pwm_simple_playback(&pwm0, &seq, 1, 0);
 }
+
+
+static void process_rgb(void *ctx) {
+    VALID_PTR(ctx);
+    struct app_color *app = ctx;
+
+    switch (app->current_state) {
+        case STATE_COLOR_SELECT_HUE:
+            update_value_with_limits(&app->hsv.hue, STEP_CHANGE_HUE, MAX_VALUE_HUE, &app->fade_up_other);
+            break;
+
+        case STATE_COLOR_SELECT_SATURATION:
+            update_value_with_limits(&app->hsv.saturation, STEP_CHANGE_SATURATION, MAX_VALUE_SATURATION, &app->fade_up_other);
+            break;
+
+        case STATE_COLOR_SELECT_BRIGHTNESS:
+            update_value_with_limits(&app->hsv.brightness, STEP_CHANGE_BRIGHT, MAX_VALUE_BRIGHTNESS, &app->fade_up_other);
+            break;
+
+        default:
+            break;
+    }
+
+    color_hsv_to_rgb(&app->hsv, &app->rgb);
+}
+
+
+static void update_value_with_limits(uint16_t *value, uint16_t step, uint16_t max_value, bool *fade_up) {
+    if (*fade_up) {
+        *value += step;
+        if (*value >= max_value) {
+            *value = max_value;
+            *fade_up = false;
+        }
+    } else {
+        *value -= step;
+        if (*value <= step) {
+            *value = 0;
+            *fade_up = true;
+        }
+    }
+}
+
+
+static void update_pwm_channels(uint16_t value_ch0, uint16_t value_ch1, uint16_t value_ch2, uint16_t value_ch3) {
+    pwm_vals.channel_0 = value_ch0;
+    pwm_vals.channel_1 = value_ch1;
+    pwm_vals.channel_2 = value_ch2;
+    pwm_vals.channel_3 = value_ch3;
+}
+
 
 
 static void init_app(struct app_color *app) {
@@ -302,17 +250,17 @@ static void init_pwm(void *ctx) {
     nrfx_pwm_init(&pwm0, &config_pwm, NULL);
     
     color_hsv_to_rgb(&app->hsv, &app->rgb);
+    update_pwm_channels(0, app->rgb.red, app->rgb.green, app->rgb.blue);
 
-    pwm_vals.channel_0 = 0;
-
-    pwm_vals.channel_1 = app->rgb.red;
-    pwm_vals.channel_2 = app->rgb.green;
-    pwm_vals.channel_3 = app->rgb.blue;
+    pwm_seq.values.p_individual = &pwm_vals;
+    pwm_seq.length = 4;
+    pwm_seq.repeats = 0;
+    pwm_seq.end_delay = 0;
 }
 
 
 static void handler_button_pressed(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
-    (void)action;
+    UNUSED(action);
     
     if (pin == BUTTON) {
         
@@ -341,7 +289,7 @@ static void handler_button_pressed(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t 
 
 
 static void init_gpiote(void *ctx) {
-    (void)ctx;
+    UNUSED(ctx);
 
     if (!nrfx_gpiote_is_init()) {
         nrfx_gpiote_init();

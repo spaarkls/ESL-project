@@ -26,5 +26,7 @@
 #define STEP_CHANGE_YELLOW_COLOR_SLOW ( 25 )
 
 #define VALID_PTR(x) if ( ( x ) == NULL ) for (;;)
+#define UNUSED(x) (void)(x)
+
 
 #endif // DEFINES_H__
