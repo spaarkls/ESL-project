@@ -18,16 +18,17 @@ SRC_FILES += \
   $(PROJ_DIR)/main.c \
   $(PROJ_DIR)/color.c \
   $(PROJ_DIR)/flash.c \
+  $(PROJ_DIR)/cli.c \
   $(SDK_ROOT)/modules/nrfx/mdk/gcc_startup_nrf52840.S \
   $(SDK_ROOT)/modules/nrfx/soc/nrfx_atomic.c \
   $(SDK_ROOT)/modules/nrfx/mdk/system_nrf52840.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_pwm.c \
+  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_nvmc.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_gpiote.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_power.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_clock.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_ppi.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_rtc.c \
-  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_nvmc.c \
   $(SDK_ROOT)/components/boards/boards.c \
   $(SDK_ROOT)/components/libraries/util/app_error.c \
   $(SDK_ROOT)/components/libraries/util/app_error_handler_gcc.c \
@@ -42,11 +43,26 @@ SRC_FILES += \
   $(SDK_ROOT)/components/libraries/timer/drv_rtc.c \
   $(SDK_ROOT)/components/libraries/atomic_fifo/nrf_atfifo.c \
   $(SDK_ROOT)/components/libraries/sortlist/nrf_sortlist.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_frontend.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_str_formatter.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_default_backends.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_backend_usb.c \
+  $(SDK_ROOT)/components/libraries/log/src/nrf_log_backend_serial.c \
+  $(SDK_ROOT)/components/libraries/usbd/app_usbd.c \
+  $(SDK_ROOT)/components/libraries/usbd/class/cdc/acm/app_usbd_cdc_acm.c \
+  $(SDK_ROOT)/components/libraries/usbd/app_usbd_core.c \
+  $(SDK_ROOT)/components/libraries/usbd/app_usbd_string_desc.c \
+  $(SDK_ROOT)/components/libraries/usbd/app_usbd_serial_num.c \
+  $(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_power.c \
+  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_usbd.c \
+  $(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_clock.c \
+  $(SDK_ROOT)/external/fprintf/nrf_fprintf.c \
+  $(SDK_ROOT)/external/fprintf/nrf_fprintf_format.c \
+  $(SDK_ROOT)/components/libraries/fifo/app_fifo.c \
 
 # Include folders common to all targets
 INC_FOLDERS += \
   $(PROJ_DIR)/config \
-  $(PROJ_DIR)/include \
   $(PROJ_DIR) \
   $(SDK_ROOT)/components \
   $(SDK_ROOT)/components/softdevice/mbr/headers \
@@ -75,12 +91,46 @@ INC_FOLDERS += \
   $(SDK_ROOT)/modules/nrfx/mdk \
   $(SDK_ROOT)/modules/nrfx \
   $(SDK_ROOT)/integration/nrfx \
+  $(SDK_ROOT)/components/libraries/usbd \
+  $(SDK_ROOT)/components/libraries/usbd/class/cdc \
+  $(SDK_ROOT)/components/libraries/usbd/class/cdc/acm \
+  $(SDK_ROOT)/components/libraries/log \
+  $(SDK_ROOT)/components/libraries/log/src \
+  $(SDK_ROOT)/external/fprintf \
+  $(SDK_ROOT)/components/libraries/fifo \
+  $(SDK_ROOT)/external/utf_converter \
+  $(SDK_ROOT)/integration/nrfx/legacy \
+
+# Libraries common to all targets
+# LIB_FILES += \
+
+# CLI_SOURCE_FILES = \
+#   $(SDK_ROOT)/components/libraries/cli/nrf_cli.c \
+#   $(SDK_ROOT)/components/libraries/cli/cdc_acm/nrf_cli_cdc_acm.c \
+#   $(SDK_ROOT)/components/libraries/queue/nrf_queue.c \
+#   $(SDK_ROOT)/components/libraries/pwr_mgmt/nrf_pwr_mgmt.c \
+#   $(SDK_ROOT)/components/libraries/experimental_section_vars/nrf_section_iter.c \
+#   $(SDK_ROOT)/external/utf_converter/utf.c
+
+# CLI_INCLUDE_DIRS = \
+#   $(SDK_ROOT)/components/libraries/cli \
+#   $(SDK_ROOT)/components/libraries/cli/cdc_acm \
+#   $(SDK_ROOT)/components/libraries/queue \
+#   $(SDK_ROOT)/components/libraries/mutex
+
+# ifdef ESTC_USB_CLI_ENABLED
+#   ifeq ($(ESTC_USB_CLI_ENABLED), 1)
+#       CFLAGS += -DESTC_USB_CLI_ENABLED
+#       SRC_FILES += $(CLI_SOURCE_FILES)
+#       INC_FOLDERS += $(CLI_INCLUDE_DIRS)
+#   endif
+# endif
 
 # Libraries common to all targets
 LIB_FILES += \
 
 # Optimization flags
-OPT = -O3 -g3
+OPT = -O2 -g
 # Uncomment the line below to enable link time optimization
 #OPT += -flto
 

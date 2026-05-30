@@ -10,6 +10,7 @@
 #include "color.h"
 #include "defines.h"
 #include "flash.h"
+#include "cli.h"
 
 
 #define BUTTON NRF_GPIO_PIN_MAP(1, 6)
@@ -76,10 +77,14 @@ int main(void) {
     init_timers(&app);
     init_gpiote(&app);
     flash_read(FLASH_ADDRESS, &app.hsv, sizeof(struct HSV));
-    
+
+    usb_init();
+
     init_pwm(&app);
 
+
     while (true) {
+        usb_process();
         __WFE();
     }
 
